@@ -326,6 +326,8 @@ int pubsubUnsubscribeAllPatterns(client *c, int notify) {
 
 /* Publish a message */
 int pubsubPublishMessage(robj *channel, robj *message) {
+    static unsigned long next_client_index = 0;
+    unsigned int client_index = 0;
     int receivers = 0;
     dictEntry *de;
     dictIterator *di;
@@ -339,11 +341,19 @@ int pubsubPublishMessage(robj *channel, robj *message) {
         listNode *ln;
         listIter li;
 
+        if (next_client_index>=listLength(list)) {
+            next_client_index = 0;
+        }
         listRewind(list,&li);
         while ((ln = listNext(&li)) != NULL) {
-            client *c = ln->value;
-            addReplyPubsubMessage(c,channel,message);
-            receivers++;
+            if (client_index == next_client_index) {
+                next_client_index = client_index + 1;
+                client *c = ln->value;
+                addReplyPubsubMessage(c,channel,message);
+                receivers++;
+                break;
+            }
+            client_index++;
         }
     }
     /* Send to clients listening to matching channels */
